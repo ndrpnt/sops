@@ -19,6 +19,7 @@ import (
 	"github.com/getsops/sops/v3/hcvault"
 	"github.com/getsops/sops/v3/kms"
 	"github.com/getsops/sops/v3/pgp"
+	"github.com/getsops/sops/v3/plugin"
 	"github.com/getsops/sops/v3/publish"
 	"go.yaml.in/yaml/v3"
 )
@@ -138,6 +139,7 @@ type keyGroup struct {
 	Vault   []string     `yaml:"hc_vault"`
 	Age     []string     `yaml:"age"`
 	PGP     []string     `yaml:"pgp"`
+	Plugin  []string     `yaml:"plugin"`
 }
 
 type gcpKmsKey struct {
@@ -182,6 +184,7 @@ type creationRule struct {
 	Age                     interface{} `yaml:"age"`     // string or []string
 	PGP                     interface{} `yaml:"pgp"`     // string or []string
 	GCPKMS                  interface{} `yaml:"gcp_kms"` // string or []string
+	Plugin                  []string    `yaml:"plugin"`
 	HCKms                   []string    `yaml:"hckms"`
 	AzureKeyVault           interface{} `yaml:"azure_keyvault"`       // string or []string
 	VaultURI                interface{} `yaml:"hc_vault_transit_uri"` // string or []string
@@ -350,6 +353,13 @@ func extractMasterKeys(group keyGroup) (sops.KeyGroup, error) {
 			return nil, err
 		}
 	}
+	for _, k := range group.Plugin {
+		if masterKey, err := plugin.NewMasterKey(k); err == nil {
+			keyGroup = append(keyGroup, masterKey)
+		} else {
+			return nil, err
+		}
+	}
 	for _, k := range group.Vault {
 		if masterKey, err := hcvault.NewMasterKeyFromURI(k); err == nil {
 			keyGroup = append(keyGroup, masterKey)
@@ -422,6 +432,13 @@ func getKeyGroupsFromCreationRule(cRule *creationRule, kmsEncryptionContext map[
 		}
 		for _, k := range hckmsMasterKeys {
 			keyGroup = append(keyGroup, k)
+		}
+		for _, key := range cRule.Plugin {
+			pluginMasterKey, err := plugin.NewMasterKey(key)
+			if err != nil {
+				return nil, err
+			}
+			keyGroup = append(keyGroup, pluginMasterKey)
 		}
 		azKeys, err := getKeysWithValidation(cRule.GetAzureKeyVaultKeys, "azure_keyvault")
 		if err != nil {

@@ -7,16 +7,18 @@ package plugin // import "github.com/getsops/sops/v3/kms"
 
 import (
 	"context"
+	"fmt"
 )
 
 type MasterKey struct {
 	encryptedKey []byte
+	name         string
 }
 
 // NewMasterKey creates a new MasterKey from an ARN, role and context, setting
 // the creation date to the current date.
-func NewMasterKey() *MasterKey {
-	return &MasterKey{}
+func NewMasterKey(name string) (*MasterKey, error) {
+	return &MasterKey{name: name}, nil
 }
 
 // Encrypt takes a SOPS data key, encrypts it with KMS and stores the result
@@ -38,7 +40,7 @@ func (key *MasterKey) EncryptContext(ctx context.Context, dataKey []byte) error 
 // EncryptIfNeeded encrypts the provided SOPS data key, if it has not been
 // encrypted yet.
 func (key *MasterKey) EncryptIfNeeded(dataKey []byte) error {
-	if key.encryptedKey == "" {
+	if key.encryptedKey == nil {
 		return key.Encrypt(dataKey)
 	}
 	return nil
@@ -75,7 +77,7 @@ func (key *MasterKey) NeedsRotation() bool {
 
 // ToString converts the key to a string representation.
 func (key *MasterKey) ToString() string {
-	return "coucou c'est ma clé"
+	return fmt.Sprintf("coucou, je suis la clé: %s", key.name)
 }
 
 // ToMap converts the MasterKey to a map for serialization purposes.
