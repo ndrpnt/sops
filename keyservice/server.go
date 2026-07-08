@@ -10,6 +10,7 @@ import (
 	"github.com/getsops/sops/v3/hcvault"
 	"github.com/getsops/sops/v3/kms"
 	"github.com/getsops/sops/v3/pgp"
+	"github.com/getsops/sops/v3/plugin"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -100,6 +101,20 @@ func (ks *Server) encryptWithAge(key *AgeKey, plaintext []byte) ([]byte, error) 
 	return []byte(ageKey.EncryptedKey), nil
 }
 
+func (ks *Server) encryptWithPlugin(_ *PluginKey, plaintext []byte) ([]byte, error) {
+	pluginKey, err := plugin.NewMasterKey()
+
+	if err != nil {
+		return nil, err
+	}
+
+	if err := pluginKey.Encrypt(plaintext); err != nil {
+		return nil, err
+	}
+
+	return []byte(pluginKey.EncryptedDataKey()), nil
+}
+
 func (ks *Server) decryptWithPgp(key *PgpKey, ciphertext []byte) ([]byte, error) {
 	pgpKey := pgp.NewMasterKeyFromFingerprint(key.Fingerprint)
 	pgpKey.EncryptedKey = string(ciphertext)
@@ -167,6 +182,16 @@ func (ks *Server) decryptWithAge(key *AgeKey, ciphertext []byte) ([]byte, error)
 	return []byte(plaintext), err
 }
 
+func (ks *Server) decryptWithPlugin(_ *PluginKey, ciphertext []byte) ([]byte, error) {
+	pluginKey, err := plugin.NewMasterKey()
+	if err != nil {
+		return nil, err
+	}
+	pluginKey.SetEncryptedDataKey(ciphertext)
+	plaintext, err := pluginKey.Decrypt()
+	return []byte(plaintext), err
+}
+
 // Encrypt takes an encrypt request and encrypts the provided plaintext with the provided key, returning the encrypted
 // result
 func (ks Server) Encrypt(ctx context.Context,
@@ -224,6 +249,14 @@ func (ks Server) Encrypt(ctx context.Context,
 		}
 	case *Key_HckmsKey:
 		ciphertext, err := ks.encryptWithHckms(k.HckmsKey, req.Plaintext)
+		if err != nil {
+			return nil, err
+		}
+		response = &EncryptResponse{
+			Ciphertext: ciphertext,
+		}
+	case *Key_PluginKey:
+		ciphertext, err := ks.encryptWithPlugin(k.PluginKey, req.Plaintext)
 		if err != nil {
 			return nil, err
 		}
@@ -336,6 +369,14 @@ func (ks Server) Decrypt(ctx context.Context,
 		}
 	case *Key_HckmsKey:
 		plaintext, err := ks.decryptWithHckms(k.HckmsKey, req.Ciphertext)
+		if err != nil {
+			return nil, err
+		}
+		response = &DecryptResponse{
+			Plaintext: plaintext,
+		}
+	case *Key_PluginKey:
+		plaintext, err := ks.decryptWithPlugin(k.PluginKey, req.Ciphertext)
 		if err != nil {
 			return nil, err
 		}
