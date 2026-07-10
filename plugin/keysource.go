@@ -7,6 +7,10 @@ package plugin // import "github.com/getsops/sops/v3/kms"
 
 import (
 	"context"
+	"fmt"
+
+	"google.golang.org/protobuf/proto"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 )
 
 type MasterKey struct {
@@ -30,8 +34,28 @@ func (key *MasterKey) Encrypt(dataKey []byte) error {
 // EncryptContext takes a SOPS data key, encrypts it with KMS and stores the result
 // in the EncryptedKey field.
 func (key *MasterKey) EncryptContext(ctx context.Context, dataKey []byte) error {
-	// Logique à implémenter pour chiffrer la dataKey à priori
-	key.SetEncryptedDataKey(dataKey)
+	req := &EncryptRequest{
+		Plaintext:     dataKey,
+		Configuration: &structpb.Struct{},
+	}
+
+	reqData, err := proto.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("failed to marshal EncryptRequest: %v", err)
+	}
+
+	respData, err := callPlugin(ctx, "encrypt", reqData)
+	if err != nil {
+		return fmt.Errorf("failed to call plugin: %v", err)
+	}
+
+	var resp *EncryptResponse
+	err = proto.Unmarshal(respData, resp)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal EncryptResponse: %v", err)
+	}
+
+	key.SetEncryptedDataKey(resp.Ciphertext)
 	return nil
 }
 
@@ -88,4 +112,8 @@ func (key MasterKey) ToMap() map[string]interface{} {
 // TypeToIdentifier returns the string identifier for the MasterKey type.
 func (key *MasterKey) TypeToIdentifier() string {
 	return "plugin"
+}
+
+func callPlugin(ctx context.Context, command string, req []byte) ([]byte, error) {
+	return nil, nil
 }
