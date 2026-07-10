@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+option go_package = "./plugin";
+
+import "google/protobuf/struct.proto";
+
+message EncryptRequest {
+  optional bytes plaintext = 1;
+  google.protobuf.Struct configuration = 2;
+}
+
+message EncryptResponse {
+  optional bytes ciphertext = 1;
+}
+
+message DecryptRequest {
+  optional bytes ciphertext = 1;
+  google.protobuf.Struct configuration = 2;
+}
+
+message DecryptResponse {
+  optional bytes plaintext = 1;
+}

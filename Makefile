@@ -80,7 +80,7 @@ showcoverage: test
 	$(GO) tool cover -html=profile.out
 
 .PHONY: generate
-generate: install-protoc-go install-protoc-go-grpc keyservice/keyservice.pb.go
+generate: install-protoc-go install-protoc-go-grpc keyservice/keyservice.pb.go plugin/plugin.pb.go
 	$(GO) generate
 
 %.pb.go: %.proto
