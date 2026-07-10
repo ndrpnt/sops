@@ -11,7 +11,7 @@ message Key {
 		VaultKey vault_key = 5;
 		AgeKey age_key = 6;
 		HckmsKey hckms_key = 7;
-        PluginKey plugin_key = 8;
+		PluginKey plugin_key = 8;
 	}
 }
 
