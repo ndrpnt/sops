@@ -23,6 +23,7 @@ import (
 	"github.com/getsops/sops/v3/hcvault"
 	"github.com/getsops/sops/v3/kms"
 	"github.com/getsops/sops/v3/pgp"
+	"github.com/getsops/sops/v3/plugin"
 )
 
 const (
@@ -43,6 +44,7 @@ type metadata struct {
 	AzureKeyVaultKeys         []azkvkey   `mapstructure:"azure_kv,omitempty,deep"`
 	VaultKeys                 []vaultkey  `mapstructure:"hc_vault,omitempty,deep"`
 	AgeKeys                   []agekey    `mapstructure:"age,omitempty,deep"`
+	PluginKeys                []pluginkey `mapstructure:"plugin,omitempty,deep"`
 	LastModified              string      `mapstructure:"lastmodified"`
 	MessageAuthenticationCode string      `mapstructure:"mac"`
 	PGPKeys                   []pgpkey    `mapstructure:"pgp,omitempty,deep"`
@@ -64,6 +66,7 @@ type keygroup struct {
 	AzureKeyVaultKeys []azkvkey   `mapstructure:"azure_kv,omitempty,deep"`
 	VaultKeys         []vaultkey  `mapstructure:"hc_vault,deep"`
 	AgeKeys           []agekey    `mapstructure:"age,deep"`
+	PluginKeys        []pluginkey `mapstructure:"plugin,deep"`
 }
 
 type pgpkey struct {
@@ -114,6 +117,10 @@ type hckmskey struct {
 	EncryptedDataKey string `mapstructure:"enc"`
 }
 
+type pluginkey struct {
+	EncryptedDataKey string `mapstructure:"enc"`
+}
+
 // metadataFromInternal converts an internal SOPS metadata representation to a
 // representation appropriate for storage.
 func metadataFromInternal(sopsMetadata sops.Metadata) metadata {
@@ -138,6 +145,7 @@ func metadataFromInternal(sopsMetadata sops.Metadata) metadata {
 		m.VaultKeys = vaultKeysFromGroup(group)
 		m.AzureKeyVaultKeys = azkvKeysFromGroup(group)
 		m.AgeKeys = ageKeysFromGroup(group)
+		m.PluginKeys = pluginKeysFromGroup(group)
 	} else {
 		for _, group := range sopsMetadata.KeyGroups {
 			m.KeyGroups = append(m.KeyGroups, keygroup{
@@ -148,6 +156,7 @@ func metadataFromInternal(sopsMetadata sops.Metadata) metadata {
 				VaultKeys:         vaultKeysFromGroup(group),
 				AzureKeyVaultKeys: azkvKeysFromGroup(group),
 				AgeKeys:           ageKeysFromGroup(group),
+				PluginKeys:        pluginKeysFromGroup(group),
 			})
 		}
 	}
@@ -258,6 +267,18 @@ func hckmsKeysFromGroup(group sops.KeyGroup) (keys []hckmskey) {
 	return
 }
 
+func pluginKeysFromGroup(group sops.KeyGroup) (keys []pluginkey) {
+	for _, key := range group {
+		switch key := key.(type) {
+		case *plugin.MasterKey:
+			keys = append(keys, pluginkey{
+				EncryptedDataKey: string(key.EncryptedDataKey()),
+			})
+		}
+	}
+	return
+}
+
 // ToInternal converts a storage-appropriate Metadata struct to a SOPS internal representation
 func (m *metadata) ToInternal() (sops.Metadata, error) {
 	lastModified, err := time.Parse(time.RFC3339, m.LastModified)
@@ -312,7 +333,7 @@ func (m *metadata) ToInternal() (sops.Metadata, error) {
 	}, nil
 }
 
-func internalGroupFrom(kmsKeys []kmskey, pgpKeys []pgpkey, gcpKmsKeys []gcpkmskey, hckmsKeys []hckmskey, azkvKeys []azkvkey, vaultKeys []vaultkey, ageKeys []agekey) (sops.KeyGroup, error) {
+func internalGroupFrom(kmsKeys []kmskey, pgpKeys []pgpkey, gcpKmsKeys []gcpkmskey, hckmsKeys []hckmskey, azkvKeys []azkvkey, vaultKeys []vaultkey, ageKeys []agekey, pluginKeys []pluginkey) (sops.KeyGroup, error) {
 	var internalGroup sops.KeyGroup
 	for _, kmsKey := range kmsKeys {
 		k, err := kmsKey.toInternal()
@@ -363,13 +384,20 @@ func internalGroupFrom(kmsKeys []kmskey, pgpKeys []pgpkey, gcpKmsKeys []gcpkmske
 		}
 		internalGroup = append(internalGroup, k)
 	}
+	for _, pluginKey := range pluginKeys {
+		k, err := pluginKey.toInternal()
+		if err != nil {
+			return nil, err
+		}
+		internalGroup = append(internalGroup, k)
+	}
 	return internalGroup, nil
 }
 
 func (m *metadata) internalKeygroups() ([]sops.KeyGroup, error) {
 	var internalGroups []sops.KeyGroup
-	if len(m.PGPKeys) > 0 || len(m.KMSKeys) > 0 || len(m.GCPKMSKeys) > 0 || len(m.HCKmsKeys) > 0 || len(m.AzureKeyVaultKeys) > 0 || len(m.VaultKeys) > 0 || len(m.AgeKeys) > 0 {
-		internalGroup, err := internalGroupFrom(m.KMSKeys, m.PGPKeys, m.GCPKMSKeys, m.HCKmsKeys, m.AzureKeyVaultKeys, m.VaultKeys, m.AgeKeys)
+	if len(m.PGPKeys) > 0 || len(m.KMSKeys) > 0 || len(m.GCPKMSKeys) > 0 || len(m.HCKmsKeys) > 0 || len(m.AzureKeyVaultKeys) > 0 || len(m.VaultKeys) > 0 || len(m.AgeKeys) > 0 || len(m.PluginKeys) > 0{
+		internalGroup, err := internalGroupFrom(m.KMSKeys, m.PGPKeys, m.GCPKMSKeys, m.HCKmsKeys, m.AzureKeyVaultKeys, m.VaultKeys, m.AgeKeys, m.PluginKeys)
 		if err != nil {
 			return nil, err
 		}
@@ -377,7 +405,7 @@ func (m *metadata) internalKeygroups() ([]sops.KeyGroup, error) {
 		return internalGroups, nil
 	} else if len(m.KeyGroups) > 0 {
 		for _, group := range m.KeyGroups {
-			internalGroup, err := internalGroupFrom(group.KMSKeys, group.PGPKeys, group.GCPKMSKeys, group.HCKmsKeys, group.AzureKeyVaultKeys, group.VaultKeys, group.AgeKeys)
+			internalGroup, err := internalGroupFrom(group.KMSKeys, group.PGPKeys, group.GCPKMSKeys, group.HCKmsKeys, group.AzureKeyVaultKeys, group.VaultKeys, group.AgeKeys, group.PluginKeys)
 			if err != nil {
 				return nil, err
 			}
@@ -474,6 +502,15 @@ func (hckmsKey *hckmskey) toInternal() (*hckms.MasterKey, error) {
 	}
 	key.EncryptedKey = hckmsKey.EncryptedDataKey
 	key.CreationDate = creationDate
+	return key, nil
+}
+
+func (pluginKey *pluginkey) toInternal() (*plugin.MasterKey, error) {
+	key, err := plugin.NewMasterKey()
+	if err != nil {
+		return nil, err
+	}
+	key.SetEncryptedDataKey([]byte(pluginKey.EncryptedDataKey))
 	return key, nil
 }
 
