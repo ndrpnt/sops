@@ -6,8 +6,10 @@ for Go V2.
 package plugin // import "github.com/getsops/sops/v3/kms"
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"os/exec"
 
 	"google.golang.org/protobuf/proto"
 	structpb "google.golang.org/protobuf/types/known/structpb"
@@ -39,18 +41,18 @@ func (key *MasterKey) EncryptContext(ctx context.Context, dataKey []byte) error 
 		Configuration: &structpb.Struct{},
 	}
 
-	reqData, err := proto.Marshal(req)
+	protoReq, err := proto.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("failed to marshal EncryptRequest: %v", err)
 	}
 
-	respData, err := callPlugin(ctx, "encrypt", reqData)
+	protoResp, err := callPlugin(ctx, "encrypt", protoReq)
 	if err != nil {
 		return fmt.Errorf("failed to call plugin: %v", err)
 	}
 
-	var resp *EncryptResponse
-	err = proto.Unmarshal(respData, resp)
+	resp := &EncryptResponse{}
+	err = proto.Unmarshal(protoResp, resp)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal EncryptResponse: %v", err)
 	}
@@ -89,7 +91,28 @@ func (key *MasterKey) Decrypt() ([]byte, error) {
 // DecryptContext decrypts the EncryptedKey with a newly created AWS KMS config, and
 // returns the result.
 func (key *MasterKey) DecryptContext(ctx context.Context) ([]byte, error) {
-	return key.encryptedKey, nil
+	req := &DecryptRequest{
+		Ciphertext:    key.encryptedKey,
+		Configuration: &structpb.Struct{},
+	}
+
+	protoReq, err := proto.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal DecryptRequest: %v", err)
+	}
+
+	protoResp, err := callPlugin(ctx, "decrypt", protoReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call plugin: %v", err)
+	}
+
+	resp := &DecryptResponse{}
+	err = proto.Unmarshal(protoResp, resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal DecryptResponse: %v", err)
+	}
+
+	return resp.Plaintext, nil
 }
 
 // NeedsRotation returns whether the data key needs to be rotated or not.
@@ -99,7 +122,7 @@ func (key *MasterKey) NeedsRotation() bool {
 
 // ToString converts the key to a string representation.
 func (key *MasterKey) ToString() string {
-	return "coucou c'est ma clé"
+	return string(key.encryptedKey)
 }
 
 // ToMap converts the MasterKey to a map for serialization purposes.
@@ -115,5 +138,16 @@ func (key *MasterKey) TypeToIdentifier() string {
 }
 
 func callPlugin(ctx context.Context, command string, req []byte) ([]byte, error) {
-	return nil, nil
+	switch command {
+	case "encrypt":
+		cmd := exec.Command("/home/lea-boyer/sops/coco", "-c", "encrypt")
+		cmd.Stdin = bytes.NewReader(req)
+		return cmd.Output()
+	case "decrypt":
+		cmd := exec.Command("/home/lea-boyer/sops/coco", "-c", "decrypt")
+		cmd.Stdin = bytes.NewReader(req)
+		return cmd.Output()
+	default:
+		panic("unrecognized command")
+	}
 }
