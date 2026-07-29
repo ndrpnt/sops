@@ -139,7 +139,7 @@ type keyGroup struct {
 	Vault   []string     `yaml:"hc_vault"`
 	Age     []string     `yaml:"age"`
 	PGP     []string     `yaml:"pgp"`
-	Plugin  []string     `yaml:"plugin"`
+	Plugin  []pluginKey  `yaml:"plugin"`
 }
 
 type gcpKmsKey struct {
@@ -161,6 +161,10 @@ type azureKVKey struct {
 
 type hckmsKey struct {
 	KeyID string `yaml:"key_id"`
+}
+
+type pluginKey struct {
+	PluginName string `yaml:"plugin_name"`
 }
 
 type destinationRule struct {
@@ -187,7 +191,7 @@ type creationRule struct {
 	HCKms                   []string    `yaml:"hckms"`
 	AzureKeyVault           interface{} `yaml:"azure_keyvault"`       // string or []string
 	VaultURI                interface{} `yaml:"hc_vault_transit_uri"` // string or []string
-	Plugin                  []string    `yaml:"plugin"`
+	Plugin                  []pluginKey `yaml:"plugin"`
 	KeyGroups               []keyGroup  `yaml:"key_groups"`
 	ShamirThreshold         int         `yaml:"shamir_threshold"`
 	UnencryptedSuffix       string      `yaml:"unencrypted_suffix"`
@@ -360,8 +364,8 @@ func extractMasterKeys(group keyGroup) (sops.KeyGroup, error) {
 			return nil, err
 		}
 	}
-	for range group.Plugin {
-		key, err := plugin.NewMasterKey()
+	for _, k := range group.Plugin {
+		key, err := plugin.NewMasterKey(k.PluginName)
 		if err != nil {
 			return nil, err
 		}
@@ -456,8 +460,8 @@ func getKeyGroupsFromCreationRule(cRule *creationRule, kmsEncryptionContext map[
 			keyGroup = append(keyGroup, k)
 		}
 		pluginKeys := cRule.Plugin
-		for range pluginKeys {
-			key, err := plugin.NewMasterKey()
+		for _, k := range pluginKeys {
+			key, err := plugin.NewMasterKey(k.PluginName)
 			if err != nil {
 				return nil, err
 			}

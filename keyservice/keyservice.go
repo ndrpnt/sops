@@ -92,6 +92,7 @@ func KeyFromMasterKey(mk keys.MasterKey) Key {
 		return Key{
 			KeyType: &Key_PluginKey{
 				PluginKey: &PluginKey{
+					PluginName: mk.PluginName,
 				},
 			},
 		}

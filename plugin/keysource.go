@@ -16,13 +16,16 @@ import (
 )
 
 type MasterKey struct {
+	PluginName   string
 	encryptedKey []byte
 }
 
 // NewMasterKey creates a new MasterKey from an ARN, role and context, setting
 // the creation date to the current date.
-func NewMasterKey() (*MasterKey, error) {
-	return &MasterKey{}, nil
+func NewMasterKey(pluginName string) (*MasterKey, error) {
+	return &MasterKey{
+		PluginName: pluginName,
+	}, nil
 }
 
 // Encrypt takes a SOPS data key, encrypts it with KMS and stores the result
@@ -46,7 +49,7 @@ func (key *MasterKey) EncryptContext(ctx context.Context, dataKey []byte) error 
 		return fmt.Errorf("failed to marshal EncryptRequest: %v", err)
 	}
 
-	protoResp, err := callPlugin(ctx, "encrypt", protoReq)
+	protoResp, err := callPlugin(ctx, key.PluginName, "encrypt", protoReq)
 	if err != nil {
 		return fmt.Errorf("failed to call plugin: %v", err)
 	}
@@ -101,7 +104,7 @@ func (key *MasterKey) DecryptContext(ctx context.Context) ([]byte, error) {
 		return nil, fmt.Errorf("failed to marshal DecryptRequest: %v", err)
 	}
 
-	protoResp, err := callPlugin(ctx, "decrypt", protoReq)
+	protoResp, err := callPlugin(ctx, key.PluginName, "decrypt", protoReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call plugin: %v", err)
 	}
@@ -137,14 +140,14 @@ func (key *MasterKey) TypeToIdentifier() string {
 	return "plugin"
 }
 
-func callPlugin(ctx context.Context, command string, req []byte) ([]byte, error) {
+func callPlugin(ctx context.Context, name string, command string, req []byte) ([]byte, error) {
 	switch command {
 	case "encrypt":
-		cmd := exec.Command("/home/lea-boyer/sops/coco", "-c", "encrypt")
+		cmd := exec.Command(name, "-c", "encrypt")
 		cmd.Stdin = bytes.NewReader(req)
 		return cmd.Output()
 	case "decrypt":
-		cmd := exec.Command("/home/lea-boyer/sops/coco", "-c", "decrypt")
+		cmd := exec.Command(name, "-c", "decrypt")
 		cmd.Stdin = bytes.NewReader(req)
 		return cmd.Output()
 	default:

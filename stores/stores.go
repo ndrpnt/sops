@@ -118,6 +118,7 @@ type hckmskey struct {
 }
 
 type pluginkey struct {
+	PluginName       string `mapstructure:"plugin_name"`
 	EncryptedDataKey string `mapstructure:"enc"`
 }
 
@@ -273,6 +274,7 @@ func pluginKeysFromGroup(group sops.KeyGroup) (keys []pluginkey) {
 		case *plugin.MasterKey:
 			keys = append(keys, pluginkey{
 				EncryptedDataKey: string(key.EncryptedDataKey()),
+				PluginName:       key.PluginName,
 			})
 		}
 	}
@@ -506,7 +508,7 @@ func (hckmsKey *hckmskey) toInternal() (*hckms.MasterKey, error) {
 }
 
 func (pluginKey *pluginkey) toInternal() (*plugin.MasterKey, error) {
-	key, err := plugin.NewMasterKey()
+	key, err := plugin.NewMasterKey(pluginKey.PluginName)
 	if err != nil {
 		return nil, err
 	}
