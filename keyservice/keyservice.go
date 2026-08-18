@@ -16,10 +16,11 @@ import (
 	"github.com/getsops/sops/v3/kms"
 	"github.com/getsops/sops/v3/pgp"
 	"github.com/getsops/sops/v3/plugin"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 )
 
 // KeyFromMasterKey converts a SOPS internal MasterKey to an RPC Key that can be serialized with Protocol Buffers
-func KeyFromMasterKey(mk keys.MasterKey) Key {
+func KeyFromMasterKey(mk keys.MasterKey) (Key, error) {
 	switch mk := mk.(type) {
 	case *pgp.MasterKey:
 		return Key{
@@ -28,7 +29,7 @@ func KeyFromMasterKey(mk keys.MasterKey) Key {
 					Fingerprint: mk.Fingerprint,
 				},
 			},
-		}
+		}, nil
 	case *gcpkms.MasterKey:
 		return Key{
 			KeyType: &Key_GcpKmsKey{
@@ -36,7 +37,7 @@ func KeyFromMasterKey(mk keys.MasterKey) Key {
 					ResourceId: mk.ResourceID,
 				},
 			},
-		}
+		}, nil
 	case *hcvault.MasterKey:
 		return Key{
 			KeyType: &Key_VaultKey{
@@ -46,7 +47,7 @@ func KeyFromMasterKey(mk keys.MasterKey) Key {
 					KeyName:      mk.KeyName,
 				},
 			},
-		}
+		}, nil
 	case *kms.MasterKey:
 		ctx := make(map[string]string)
 		for k, v := range mk.EncryptionContext {
@@ -61,7 +62,7 @@ func KeyFromMasterKey(mk keys.MasterKey) Key {
 					AwsProfile: mk.AwsProfile,
 				},
 			},
-		}
+		}, nil
 	case *azkv.MasterKey:
 		return Key{
 			KeyType: &Key_AzureKeyvaultKey{
@@ -71,7 +72,7 @@ func KeyFromMasterKey(mk keys.MasterKey) Key {
 					Version:  mk.Version,
 				},
 			},
-		}
+		}, nil
 	case *age.MasterKey:
 		return Key{
 			KeyType: &Key_AgeKey{
@@ -79,7 +80,7 @@ func KeyFromMasterKey(mk keys.MasterKey) Key {
 					Recipient: mk.Recipient,
 				},
 			},
-		}
+		}, nil
 	case *hckms.MasterKey:
 		return Key{
 			KeyType: &Key_HckmsKey{
@@ -87,15 +88,20 @@ func KeyFromMasterKey(mk keys.MasterKey) Key {
 					KeyId: mk.KeyID,
 				},
 			},
-		}
+		}, nil
 	case *plugin.MasterKey:
+		protoConfig, err := structpb.NewStruct(mk.Configuration)
+		if err != nil {
+			return Key{}, fmt.Errorf("failed to build config struct: %v", err)
+		}
 		return Key{
 			KeyType: &Key_PluginKey{
 				PluginKey: &PluginKey{
-					PluginName: mk.PluginName,
+					PluginName:    mk.PluginName,
+					Configuration: protoConfig,
 				},
 			},
-		}
+		}, nil
 	default:
 		panic(fmt.Sprintf("Tried to convert unknown MasterKey type %T to keyservice.Key", mk))
 	}

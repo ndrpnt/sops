@@ -16,15 +16,17 @@ import (
 )
 
 type MasterKey struct {
-	PluginName   string
-	encryptedKey []byte
+	PluginName    string
+	Configuration map[string]any
+	encryptedKey  []byte
 }
 
 // NewMasterKey creates a new MasterKey from an ARN, role and context, setting
 // the creation date to the current date.
-func NewMasterKey(pluginName string) (*MasterKey, error) {
+func NewMasterKey(pluginName string, additionalConfig map[string]any) (*MasterKey, error) {
 	return &MasterKey{
-		PluginName: pluginName,
+		PluginName:    pluginName,
+		Configuration: additionalConfig,
 	}, nil
 }
 
@@ -39,9 +41,13 @@ func (key *MasterKey) Encrypt(dataKey []byte) error {
 // EncryptContext takes a SOPS data key, encrypts it with KMS and stores the result
 // in the EncryptedKey field.
 func (key *MasterKey) EncryptContext(ctx context.Context, dataKey []byte) error {
+	protoConfig, err := structpb.NewStruct(key.Configuration)
+	if err != nil {
+		return fmt.Errorf("failed to build config struct: %v", err)
+	}
 	req := &EncryptRequest{
 		Plaintext:     dataKey,
-		Configuration: &structpb.Struct{},
+		Configuration: protoConfig,
 	}
 
 	protoReq, err := proto.Marshal(req)
@@ -94,9 +100,13 @@ func (key *MasterKey) Decrypt() ([]byte, error) {
 // DecryptContext decrypts the EncryptedKey with a newly created AWS KMS config, and
 // returns the result.
 func (key *MasterKey) DecryptContext(ctx context.Context) ([]byte, error) {
+	protoConfig, err := structpb.NewStruct(key.Configuration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build config struct: %v", err)
+	}
 	req := &DecryptRequest{
 		Ciphertext:    key.encryptedKey,
-		Configuration: &structpb.Struct{},
+		Configuration: protoConfig,
 	}
 
 	protoReq, err := proto.Marshal(req)

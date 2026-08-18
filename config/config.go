@@ -164,7 +164,8 @@ type hckmsKey struct {
 }
 
 type pluginKey struct {
-	PluginName string `yaml:"plugin_name"`
+	PluginName    string         `yaml:"plugin_name"`
+	Configuration map[string]any `yaml:"configuration"`
 }
 
 type destinationRule struct {
@@ -365,7 +366,7 @@ func extractMasterKeys(group keyGroup) (sops.KeyGroup, error) {
 		}
 	}
 	for _, k := range group.Plugin {
-		key, err := plugin.NewMasterKey(k.PluginName)
+		key, err := plugin.NewMasterKey(k.PluginName, k.Configuration)
 		if err != nil {
 			return nil, err
 		}
@@ -461,7 +462,7 @@ func getKeyGroupsFromCreationRule(cRule *creationRule, kmsEncryptionContext map[
 		}
 		pluginKeys := cRule.Plugin
 		for _, k := range pluginKeys {
-			key, err := plugin.NewMasterKey(k.PluginName)
+			key, err := plugin.NewMasterKey(k.PluginName, k.Configuration)
 			if err != nil {
 				return nil, err
 			}

@@ -798,8 +798,12 @@ func (m *Metadata) UpdateMasterKeysWithKeyServices(dataKey []byte, svcs []keyser
 			}
 		}
 		for _, key := range group {
-			svcKey := keyservice.KeyFromMasterKey(key)
 			var keyErrs []error
+			svcKey, err := keyservice.KeyFromMasterKey(key)
+			if err != nil {
+				keyErrs = append(keyErrs, fmt.Errorf("failed to call plugin: %v", err))
+				continue
+			}
 			encrypted := false
 			for _, svc := range svcs {
 				rsp, err := svc.Encrypt(context.Background(), &keyservice.EncryptRequest{
@@ -924,7 +928,10 @@ func sortKeyGroupIndices(group KeyGroup, decryptionOrder []string) []int {
 // decryptKey tries to decrypt the contents of the provided MasterKey with any
 // of the key services, returning as soon as one key service succeeds.
 func decryptKey(key keys.MasterKey, svcs []keyservice.KeyServiceClient) ([]byte, error) {
-	svcKey := keyservice.KeyFromMasterKey(key)
+	svcKey, err := keyservice.KeyFromMasterKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call plugin: %v", err)
+	}
 	var part []byte
 	decryptErr := decryptKeyError{
 		keyName: key.ToString(),

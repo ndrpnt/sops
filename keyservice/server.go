@@ -102,7 +102,7 @@ func (ks *Server) encryptWithAge(key *AgeKey, plaintext []byte) ([]byte, error) 
 }
 
 func (ks *Server) encryptWithPlugin(key *PluginKey, plaintext []byte) ([]byte, error) {
-	pluginKey, err := plugin.NewMasterKey(key.PluginName)
+	pluginKey, err := plugin.NewMasterKey(key.PluginName, key.Configuration.AsMap())
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +182,7 @@ func (ks *Server) decryptWithAge(key *AgeKey, ciphertext []byte) ([]byte, error)
 }
 
 func (ks *Server) decryptWithPlugin(key *PluginKey, ciphertext []byte) ([]byte, error) {
-	pluginKey, err := plugin.NewMasterKey(key.PluginName)
+	pluginKey, err := plugin.NewMasterKey(key.PluginName, key.Configuration.AsMap())
 	if err != nil {
 		return nil, err
 	}

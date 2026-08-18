@@ -28,24 +28,23 @@ func main() {
 	}
 }
 
-func decrypt() error {
+func encrypt() error {
 	protoReq, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		return fmt.Errorf("reading stdin: %w", err)
 	}
 
-	req := &DecryptRequest{}
+	req := &EncryptRequest{}
 	err = proto.Unmarshal(protoReq, req)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal EncryptRequest: %v", err)
 	}
 
-	// decrypt logic
-	suffixEncryption := len(req.Ciphertext) - 3
-	respDecrypted := req.Ciphertext[0:suffixEncryption]
+	// encrypt logic
+	respEncryptStr := string(req.Plaintext) + req.Configuration.AsMap()["suffix"].(string)
 
 	resp := &EncryptResponse{
-		Ciphertext: respDecrypted,
+		Ciphertext: []byte(respEncryptStr),
 	}
 
 	protoResp, err := proto.Marshal(resp)
@@ -60,23 +59,24 @@ func decrypt() error {
 	return nil
 }
 
-func encrypt() error {
+func decrypt() error {
 	protoReq, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		return fmt.Errorf("reading stdin: %w", err)
 	}
 
-	req := &EncryptRequest{}
+	req := &DecryptRequest{}
 	err = proto.Unmarshal(protoReq, req)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal EncryptRequest: %v", err)
 	}
 
-	// encrypt logic
-	respEncryptStr := string(req.Plaintext) + "bla"
+	// decrypt logic
+	suffixEncryption := len(req.Ciphertext) - len(req.Configuration.AsMap()["suffix"].(string))
+	respDecrypted := req.Ciphertext[0:suffixEncryption]
 
 	resp := &EncryptResponse{
-		Ciphertext: []byte(respEncryptStr),
+		Ciphertext: respDecrypted,
 	}
 
 	protoResp, err := proto.Marshal(resp)

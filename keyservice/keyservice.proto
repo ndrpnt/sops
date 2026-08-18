@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+import "google/protobuf/struct.proto";
+
 option go_package = "./keyservice";
 
 message Key {
@@ -52,6 +54,7 @@ message HckmsKey {
 
 message PluginKey {
 	string plugin_name = 1;
+    google.protobuf.Struct configuration = 2;
 }
 
 message EncryptRequest {
