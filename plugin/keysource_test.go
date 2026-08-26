@@ -4,43 +4,58 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )
 
-// TestCallPluginHelper is skipped unless GO_WANT_HELPER_PROCESS env var is set.
-// os.Exit must be called to bypass go test pretty printing.
-func TestCallPluginHelper(t *testing.T) {
-	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
-		return
+func TestMain(m *testing.M) {
+	if os.Getenv(pluginEnvKey) == "1" {
+		if err := mockPlugin(); err != nil {
+			fmt.Fprintf(os.Stderr, "mock-plugin: %v\n", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
 	}
-	// In the plugin helper, arguments are offsetted by "-test.run=..." and "--".
-	arg1 := os.Args[3]
-	arg2 := os.Args[4]
+	os.Exit(m.Run())
+}
+
+func TestMasterKey_DecryptContext(t *testing.T) {
+	masterKey, err := NewMasterKey(
+		os.Args[0],
+		map[string]any{"suffix": "ouiiiiii"},
+	)
+	require.NoError(t, err)
+
+	err = masterKey.EncryptContext(t.Context(), []byte("my_key"))
+	require.NoError(t, err)
+	require.Equal(t, []byte("my_keyouiiiiii"), masterKey.encryptedKey)
+
+	dataKey, err := masterKey.DecryptContext(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, []byte("my_key"), dataKey)
+}
+
+func mockPlugin() error {
+	arg1, arg2 := os.Args[1], os.Args[2]
 	if arg1 != "-c" {
-		fmt.Fprintf(os.Stderr, "bad first argument: %s\n", arg1)
-		os.Exit(1)
+		return fmt.Errorf("invalid first argument: %s\n", arg1)
 	}
 	switch arg2 {
 	case "encrypt":
 		if err := encrypt(); err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("encrypt failed: %v\n", err)
 		}
 	case "decrypt":
 		if err := decrypt(); err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("decrypt failed: %v\n", err)
 		}
 	default:
-		fmt.Fprintf(os.Stderr, "bad second argument: %s\n", arg2)
-		os.Exit(1)
+		return fmt.Errorf("invalid second argument: %s\n", arg2)
 	}
-	os.Exit(0)
+	return nil
 }
 
 func encrypt() error {
@@ -93,29 +108,4 @@ func decrypt() error {
 	}
 
 	return nil
-}
-
-func TestMasterKey_DecryptContext(t *testing.T) {
-	masterKey, err := NewMasterKey("plugin_name", map[string]any{
-		"suffix": "ouiiiiii",
-	})
-	assert.NoError(t, err)
-
-	masterKey.execCommand = func(name string, arg ...string) *exec.Cmd {
-		assert.Equal(t, "plugin_name", name)
-		cmd := exec.Command(
-			os.Args[0],
-			append([]string{"-test.run=TestCallPluginHelper", "--"}, arg...)...,
-		)
-		cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1"}
-		return cmd
-	}
-
-	err = masterKey.EncryptContext(t.Context(), []byte("my_key"))
-	assert.NoError(t, err)
-	assert.Equal(t, []byte("my_keyouiiiiii"), masterKey.encryptedKey)
-
-	dataKey, err := masterKey.DecryptContext(t.Context())
-	assert.NoError(t, err)
-	assert.Equal(t, []byte("my_key"), dataKey)
 }

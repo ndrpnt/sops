@@ -15,13 +15,14 @@ import (
 	structpb "google.golang.org/protobuf/types/known/structpb"
 )
 
+const pluginEnvKey = "__SOPS_PLUGIN"
+
+var pluginEnv = []string{pluginEnvKey + "=1"}
+
 type MasterKey struct {
 	PluginName    string
 	Configuration map[string]any
 	encryptedKey  []byte
-
-	// For testing.
-	execCommand func(string, ...string) *exec.Cmd
 }
 
 // NewMasterKey creates a new MasterKey from an ARN, role and context, setting
@@ -58,7 +59,7 @@ func (key *MasterKey) EncryptContext(ctx context.Context, dataKey []byte) error 
 		return fmt.Errorf("failed to marshal EncryptRequest: %v", err)
 	}
 
-	protoResp, err := key.callPlugin(ctx, "encrypt", protoReq)
+	protoResp, err := callPlugin(ctx, key.PluginName, "encrypt", protoReq)
 	if err != nil {
 		return fmt.Errorf("failed to call plugin: %v", err)
 	}
@@ -117,7 +118,7 @@ func (key *MasterKey) DecryptContext(ctx context.Context) ([]byte, error) {
 		return nil, fmt.Errorf("failed to marshal DecryptRequest: %v", err)
 	}
 
-	protoResp, err := key.callPlugin(ctx, "decrypt", protoReq)
+	protoResp, err := callPlugin(ctx, key.PluginName, "decrypt", protoReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call plugin: %v", err)
 	}
@@ -153,19 +154,16 @@ func (key *MasterKey) TypeToIdentifier() string {
 	return "plugin"
 }
 
-func (key *MasterKey) callPlugin(_ context.Context, command string, req []byte) ([]byte, error) {
-	execCommand := exec.Command
-	if key.execCommand != nil {
-		execCommand = key.execCommand
-	}
-
+func callPlugin(_ context.Context, name string, command string, req []byte) ([]byte, error) {
 	switch command {
 	case "encrypt":
-		cmd := execCommand(key.PluginName, "-c", "encrypt")
+		cmd := exec.Command(name, "-c", "encrypt")
+		cmd.Env = pluginEnv
 		cmd.Stdin = bytes.NewReader(req)
 		return cmd.Output()
 	case "decrypt":
-		cmd := execCommand(key.PluginName, "-c", "decrypt")
+		cmd := exec.Command(name, "-c", "decrypt")
+		cmd.Env = pluginEnv
 		cmd.Stdin = bytes.NewReader(req)
 		return cmd.Output()
 	default:
