@@ -19,6 +19,9 @@ type MasterKey struct {
 	PluginName    string
 	Configuration map[string]any
 	encryptedKey  []byte
+
+	// For testing.
+	execCommand func(string, ...string) *exec.Cmd
 }
 
 // NewMasterKey creates a new MasterKey from an ARN, role and context, setting
@@ -55,7 +58,7 @@ func (key *MasterKey) EncryptContext(ctx context.Context, dataKey []byte) error 
 		return fmt.Errorf("failed to marshal EncryptRequest: %v", err)
 	}
 
-	protoResp, err := callPlugin(ctx, key.PluginName, "encrypt", protoReq)
+	protoResp, err := key.callPlugin(ctx, "encrypt", protoReq)
 	if err != nil {
 		return fmt.Errorf("failed to call plugin: %v", err)
 	}
@@ -114,7 +117,7 @@ func (key *MasterKey) DecryptContext(ctx context.Context) ([]byte, error) {
 		return nil, fmt.Errorf("failed to marshal DecryptRequest: %v", err)
 	}
 
-	protoResp, err := callPlugin(ctx, key.PluginName, "decrypt", protoReq)
+	protoResp, err := key.callPlugin(ctx, "decrypt", protoReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call plugin: %v", err)
 	}
@@ -150,14 +153,19 @@ func (key *MasterKey) TypeToIdentifier() string {
 	return "plugin"
 }
 
-func callPlugin(ctx context.Context, name string, command string, req []byte) ([]byte, error) {
+func (key *MasterKey) callPlugin(_ context.Context, command string, req []byte) ([]byte, error) {
+	execCommand := exec.Command
+	if key.execCommand != nil {
+		execCommand = key.execCommand
+	}
+
 	switch command {
 	case "encrypt":
-		cmd := exec.Command(name, "-c", "encrypt")
+		cmd := execCommand(key.PluginName, "-c", "encrypt")
 		cmd.Stdin = bytes.NewReader(req)
 		return cmd.Output()
 	case "decrypt":
-		cmd := exec.Command(name, "-c", "decrypt")
+		cmd := execCommand(key.PluginName, "-c", "decrypt")
 		cmd.Stdin = bytes.NewReader(req)
 		return cmd.Output()
 	default:

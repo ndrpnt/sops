@@ -15,12 +15,12 @@ func main() {
 	switch *command {
 	case "encrypt":
 		if err := encrypt(); err != nil {
-			fmt.Fprintln(os.Stderr, "error:", err)
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	case "decrypt":
 		if err := decrypt(); err != nil {
-			fmt.Fprintln(os.Stderr, "error:", err)
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			os.Exit(1)
 		}
 	default:
