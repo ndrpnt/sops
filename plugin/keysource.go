@@ -8,8 +8,10 @@ package plugin // import "github.com/getsops/sops/v3/kms"
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
+	"strings"
 
 	"google.golang.org/protobuf/proto"
 	structpb "google.golang.org/protobuf/types/known/structpb"
@@ -155,18 +157,28 @@ func (key *MasterKey) TypeToIdentifier() string {
 }
 
 func callPlugin(_ context.Context, name string, command string, req []byte) ([]byte, error) {
-	switch command {
-	case "encrypt":
-		cmd := exec.Command(name, "-c", "encrypt")
-		cmd.Env = pluginEnv
-		cmd.Stdin = bytes.NewReader(req)
-		return cmd.Output()
-	case "decrypt":
-		cmd := exec.Command(name, "-c", "decrypt")
-		cmd.Env = pluginEnv
-		cmd.Stdin = bytes.NewReader(req)
-		return cmd.Output()
-	default:
-		panic("unrecognized command")
+	cmd := exec.Command(name, "-c", command)
+	cmd.Env = pluginEnv
+	cmd.Stdin = bytes.NewReader(req)
+	out, err := cmd.Output()
+	if err != nil {
+		return out, &cmdError{err}
 	}
+	return out, nil
+}
+
+type cmdError struct{ error }
+
+func (e *cmdError) Unwrap() error { return e.error }
+
+func (e *cmdError) Error() string {
+	var b strings.Builder
+	fmt.Fprint(&b, e.error)
+	var ee *exec.ExitError
+	if errors.As(e, &ee) {
+		if s := bytes.TrimSpace(ee.Stderr); len(s) > 0 {
+			fmt.Fprintf(&b, ": %s", s)
+		}
+	}
+	return b.String()
 }

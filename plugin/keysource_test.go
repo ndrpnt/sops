@@ -39,6 +39,9 @@ func TestMasterKey_DecryptContext(t *testing.T) {
 }
 
 func mockPlugin() error {
+	if argc := len(os.Args); argc != 3 {
+		return fmt.Errorf("invalid argument count: %d\n", argc)
+	}
 	arg1, arg2 := os.Args[1], os.Args[2]
 	if arg1 != "-c" {
 		return fmt.Errorf("invalid first argument: %s\n", arg1)
