@@ -33,6 +33,9 @@ type MasterKey struct {
 // NewMasterKey creates a new MasterKey from an ARN, role and context, setting
 // the creation date to the current date.
 func NewMasterKey(pluginName string, additionalConfig map[string]any) (*MasterKey, error) {
+	if strings.ContainsRune(pluginName, os.PathSeparator) {
+		return nil, fmt.Errorf("invalid plugin name, '/' not allowed in: %q", pluginName)
+	}
 	return &MasterKey{
 		PluginName:    pluginName,
 		Configuration: additionalConfig,
