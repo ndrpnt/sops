@@ -19,9 +19,10 @@ import (
 	structpb "google.golang.org/protobuf/types/known/structpb"
 )
 
-const pluginEnvKey = "__SOPS_PLUGIN"
-
-var pluginEnv = []string{pluginEnvKey + "=1"}
+const (
+	pluginEnvKey = "__SOPS_PLUGIN"
+	pluginEnv    = pluginEnvKey + "=1"
+)
 
 type MasterKey struct {
 	PluginName    string
@@ -160,7 +161,11 @@ func (key *MasterKey) TypeToIdentifier() string {
 
 func callPlugin(ctx context.Context, name string, command string, req []byte) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, name, "-c", command)
-	cmd.Env = pluginEnv
+	// Bad PWD, see cmd.environ() for more
+	cmd.Env = append(os.Environ(), pluginEnv)
+	// Avoid running plugins in the client's working directory,
+	// as it might differ between clients.
+	cmd.Dir = os.TempDir()
 	stdin := bytes.NewReader(req)
 	var stdout, stderr bytes.Buffer
 	debugWriter := io.Discard
