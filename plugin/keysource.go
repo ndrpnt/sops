@@ -10,6 +10,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -156,29 +158,27 @@ func (key *MasterKey) TypeToIdentifier() string {
 	return "plugin"
 }
 
-func callPlugin(_ context.Context, name string, command string, req []byte) ([]byte, error) {
-	cmd := exec.Command(name, "-c", command)
+func callPlugin(ctx context.Context, name string, command string, req []byte) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, name, "-c", command)
 	cmd.Env = pluginEnv
-	cmd.Stdin = bytes.NewReader(req)
-	out, err := cmd.Output()
+	stdin := bytes.NewReader(req)
+	var stdout, stderr bytes.Buffer
+	debugWriter := io.Discard
+	if os.Getenv("SOPS_PLUGIN_KMS_DEBUG") == "1" {
+		debugWriter = os.Stderr
+	}
+	cmd.Stdin = io.TeeReader(stdin, debugWriter)
+	cmd.Stdout = io.MultiWriter(debugWriter, &stdout)
+	cmd.Stderr = io.MultiWriter(debugWriter, &stderr)
+	err := cmd.Run()
 	if err != nil {
-		return out, &cmdError{err}
-	}
-	return out, nil
-}
-
-type cmdError struct{ error }
-
-func (e *cmdError) Unwrap() error { return e.error }
-
-func (e *cmdError) Error() string {
-	var b strings.Builder
-	fmt.Fprint(&b, e.error)
-	var ee *exec.ExitError
-	if errors.As(e, &ee) {
-		if s := bytes.TrimSpace(ee.Stderr); len(s) > 0 {
-			fmt.Fprintf(&b, ": %s", s)
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			if s := strings.TrimSpace(stderr.String()); len(s) > 0 {
+				return nil, fmt.Errorf("%v: %s", err, s)
+			}
 		}
+		return nil, err
 	}
-	return b.String()
+	return stdout.Bytes(), nil
 }
