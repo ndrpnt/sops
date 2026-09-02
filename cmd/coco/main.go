@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 
+	pluginpb "github.com/getsops/sops/v3/cmd/sops-kms-plugin-scw/proto"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -34,7 +35,7 @@ func encrypt() error {
 		return fmt.Errorf("reading stdin: %w", err)
 	}
 
-	req := &EncryptRequest{}
+	req := &pluginpb.EncryptRequest{}
 	err = proto.Unmarshal(protoReq, req)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal EncryptRequest: %v", err)
@@ -43,7 +44,7 @@ func encrypt() error {
 	// encrypt logic
 	respEncryptStr := string(req.Plaintext) + req.Configuration.AsMap()["suffix"].(string)
 
-	resp := &EncryptResponse{
+	resp := &pluginpb.EncryptResponse{
 		Ciphertext: []byte(respEncryptStr),
 	}
 
@@ -65,7 +66,7 @@ func decrypt() error {
 		return fmt.Errorf("reading stdin: %w", err)
 	}
 
-	req := &DecryptRequest{}
+	req := &pluginpb.DecryptRequest{}
 	err = proto.Unmarshal(protoReq, req)
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal EncryptRequest: %v", err)
@@ -75,7 +76,7 @@ func decrypt() error {
 	suffixEncryption := len(req.Ciphertext) - len(req.Configuration.AsMap()["suffix"].(string))
 	respDecrypted := req.Ciphertext[0:suffixEncryption]
 
-	resp := &EncryptResponse{
+	resp := &pluginpb.EncryptResponse{
 		Ciphertext: respDecrypted,
 	}
 

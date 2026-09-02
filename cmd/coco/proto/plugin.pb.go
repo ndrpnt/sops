@@ -4,14 +4,15 @@
 // 	protoc        v3.21.12
 // source: plugin/plugin.proto
 
-package main
+package pluginpb
 
 import (
+	reflect "reflect"
+	sync "sync"
+
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	structpb "google.golang.org/protobuf/types/known/structpb"
-	reflect "reflect"
-	sync "sync"
 )
 
 const (
@@ -265,14 +266,16 @@ func file_plugin_plugin_proto_rawDescGZIP() []byte {
 	return file_plugin_plugin_proto_rawDescData
 }
 
-var file_plugin_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
-var file_plugin_plugin_proto_goTypes = []any{
-	(*EncryptRequest)(nil),  // 0: plugin.v1.EncryptRequest
-	(*EncryptResponse)(nil), // 1: plugin.v1.EncryptResponse
-	(*DecryptRequest)(nil),  // 2: plugin.v1.DecryptRequest
-	(*DecryptResponse)(nil), // 3: plugin.v1.DecryptResponse
-	(*structpb.Struct)(nil), // 4: google.protobuf.Struct
-}
+var (
+	file_plugin_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+	file_plugin_plugin_proto_goTypes  = []any{
+		(*EncryptRequest)(nil),  // 0: plugin.v1.EncryptRequest
+		(*EncryptResponse)(nil), // 1: plugin.v1.EncryptResponse
+		(*DecryptRequest)(nil),  // 2: plugin.v1.DecryptRequest
+		(*DecryptResponse)(nil), // 3: plugin.v1.DecryptResponse
+		(*structpb.Struct)(nil), // 4: google.protobuf.Struct
+	}
+)
 var file_plugin_plugin_proto_depIdxs = []int32{
 	4, // 0: plugin.v1.EncryptRequest.configuration:type_name -> google.protobuf.Struct
 	4, // 1: plugin.v1.DecryptRequest.configuration:type_name -> google.protobuf.Struct
