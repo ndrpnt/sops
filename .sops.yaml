@@ -1,5 +1,5 @@
 creation_rules:
   - plugin:
-      - plugin_name: "coco"
+      - plugin_name: sops-kms-plugin-suffix
         configuration:
           suffix: "tatataatatayoohh"
