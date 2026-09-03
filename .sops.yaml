@@ -3,3 +3,8 @@ creation_rules:
       - plugin_name: sops-kms-plugin-suffix
         configuration:
           suffix: "tatataatatayoohh"
+      - plugin_name: sops-kms-plugin-scw
+        configuration:
+          id: 484cb9f0-b90d-4123-abc8-423e72d60edf
+          region: fr-par
+          associated_data: aGVsbG8=
