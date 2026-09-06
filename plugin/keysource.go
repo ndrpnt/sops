@@ -22,6 +22,13 @@ import (
 const (
 	pluginEnvKey = "__SOPS_PLUGIN"
 	pluginEnv    = pluginEnvKey + "=1"
+	// SopsPluginExecEnvFormat is the format fo the env var to
+	// override default executable name. %s should be replace with plugin name
+	// in upper case.
+	SopsPluginExecEnvFormat = "SOPS_PLUGIN_KMS_%s_EXEC"
+	// If EnvVar unset, sops calls sops-plugin-kms-${PLUGIN_NAME}
+	// The plugin binary should be in the PATH
+	SopsPluginBinaryPrefix = "sops-plugin-kms-"
 )
 
 type MasterKey struct {
@@ -163,7 +170,15 @@ func (key *MasterKey) TypeToIdentifier() string {
 }
 
 func callPlugin(ctx context.Context, name string, command string, req []byte) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, name, "-c", command)
+	var cmd *exec.Cmd
+	sopsPluginExecEnv := strings.ToUpper(fmt.Sprintf(SopsPluginExecEnvFormat, name))
+	if execEnv := os.Getenv(sopsPluginExecEnv); execEnv != "" {
+		cmd = exec.CommandContext(ctx, execEnv, "-c", command)
+	} else {
+		// If envVar not defined, plugin should be in PATH
+		cmd = exec.CommandContext(ctx, SopsPluginBinaryPrefix+name, "-c", command)
+	}
+
 	// Bad PWD, see cmd.environ() for more
 	cmd.Env = append(os.Environ(), pluginEnv)
 	// Avoid running plugins in the client's working directory,
