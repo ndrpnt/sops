@@ -8,13 +8,15 @@ package plugin // import "github.com/getsops/sops/v3/kms"
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"strings"
 
+	"github.com/getsops/sops/v3/logging"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 	structpb "google.golang.org/protobuf/types/known/structpb"
 )
@@ -30,6 +32,13 @@ const (
 	// The plugin binary should be in the PATH
 	SopsPluginBinaryPrefix = "sops-plugin-kms-"
 )
+
+// log is the global logger for any plugin MasterKey.
+var log *logrus.Logger
+
+func init() {
+	log = logging.NewLogger("PLUGIN")
+}
 
 type MasterKey struct {
 	PluginName    string
@@ -184,16 +193,20 @@ func callPlugin(ctx context.Context, name string, command string, req []byte) ([
 	// Avoid running plugins in the client's working directory,
 	// as it might differ between clients.
 	cmd.Dir = os.TempDir()
-	stdin := bytes.NewReader(req)
+	cmd.Stdin = bytes.NewReader(req)
 	var stdout, stderr bytes.Buffer
-	debugWriter := io.Discard
-	if os.Getenv("SOPS_PLUGIN_KMS_DEBUG") == "1" {
-		debugWriter = os.Stderr
-	}
-	cmd.Stdin = io.TeeReader(stdin, debugWriter)
-	cmd.Stdout = io.MultiWriter(debugWriter, &stdout)
-	cmd.Stderr = io.MultiWriter(debugWriter, &stderr)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
 	err := cmd.Run()
+	if log.IsLevelEnabled(logrus.DebugLevel) {
+		log.WithFields(logrus.Fields{"plugin": name, "command": command}).Debug("plugin call")
+		log.Debugf("stdin:\n%s", hex.Dump(req))
+		log.Debugf("stdout:\n%s", hex.Dump(stdout.Bytes()))
+		if s := strings.TrimSpace(stderr.String()); s != "" {
+			log.Debugf("stderr: %s", s)
+		}
+	}
+
 	if err != nil {
 		var ee *exec.ExitError
 		if errors.As(err, &ee) {

@@ -180,7 +180,8 @@ func main() {
 						fmt.Fprint(c.App.Writer, GenZshCompletion(app.Name))
 						return nil
 					},
-				}},
+				},
+			},
 		},
 		{
 			Name:      "exec-env",
@@ -822,7 +823,7 @@ func main() {
 				},
 			}, keyserviceFlags...),
 			Action: func(c *cli.Context) error {
-				if c.Bool("verbose") {
+				if c.Bool("verbose") || c.GlobalBool("verbose") {
 					logging.SetLevel(logrus.DebugLevel)
 				}
 				readFromStdin := c.NArg() == 0
@@ -1008,7 +1009,7 @@ func main() {
 				},
 			}, keyserviceFlags...),
 			Action: func(c *cli.Context) error {
-				if c.Bool("verbose") {
+				if c.Bool("verbose") || c.GlobalBool("verbose") {
 					logging.SetLevel(logrus.DebugLevel)
 				}
 				readFromStdin := c.NArg() == 0
@@ -1068,7 +1069,6 @@ func main() {
 					KeyServices:   svcs,
 					encryptConfig: encConfig,
 				})
-
 				if err != nil {
 					return toExitError(err)
 				}
