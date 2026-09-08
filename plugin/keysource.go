@@ -179,15 +179,13 @@ func (key *MasterKey) TypeToIdentifier() string {
 }
 
 func callPlugin(ctx context.Context, name string, command string, req []byte) ([]byte, error) {
-	var cmd *exec.Cmd
+	execName := SopsPluginBinaryPrefix + name
 	sopsPluginExecEnv := strings.ToUpper(fmt.Sprintf(SopsPluginExecEnvFormat, name))
 	if execEnv := os.Getenv(sopsPluginExecEnv); execEnv != "" {
-		cmd = exec.CommandContext(ctx, execEnv, "-c", command)
-	} else {
-		// If envVar not defined, plugin should be in PATH
-		cmd = exec.CommandContext(ctx, SopsPluginBinaryPrefix+name, "-c", command)
+		execName = execEnv
 	}
 
+	cmd := exec.CommandContext(ctx, execName, "-c", command)
 	// Bad PWD, see cmd.environ() for more
 	cmd.Env = append(os.Environ(), pluginEnv)
 	// Avoid running plugins in the client's working directory,
