@@ -1,6 +1,7 @@
 package keyservice
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/getsops/sops/v3/age"
@@ -194,7 +195,8 @@ func (ks *Server) decryptWithPlugin(key *PluginKey, ciphertext []byte) ([]byte, 
 // Encrypt takes an encrypt request and encrypts the provided plaintext with the provided key, returning the encrypted
 // result
 func (ks Server) Encrypt(ctx context.Context,
-	req *EncryptRequest) (*EncryptResponse, error) {
+	req *EncryptRequest,
+) (*EncryptResponse, error) {
 	key := req.Key
 	var response *EncryptResponse
 	switch k := key.KeyType.(type) {
@@ -290,6 +292,12 @@ func keyToString(key *Key) string {
 		return fmt.Sprintf("Hashicorp Vault key with URI %s/v1/%s/keys/%s", k.VaultKey.VaultAddress, k.VaultKey.EnginePath, k.VaultKey.KeyName)
 	case *Key_HckmsKey:
 		return fmt.Sprintf("HuaweiCloud KMS key with ID %s", k.HckmsKey.KeyId)
+	case *Key_PluginKey:
+		config, err := json.Marshal(k.PluginKey.Configuration)
+		if err != nil {
+			config = []byte(fmt.Sprintf("invalid: %v", err))
+		}
+		return fmt.Sprintf("key from plugin with name %s and configuration %s", k.PluginKey.PluginName, config)
 	default:
 		return "Unknown key type"
 	}
@@ -314,7 +322,8 @@ func (ks Server) prompt(key *Key, requestType string) error {
 // Decrypt takes a decrypt request and decrypts the provided ciphertext with the provided key, returning the decrypted
 // result
 func (ks Server) Decrypt(ctx context.Context,
-	req *DecryptRequest) (*DecryptResponse, error) {
+	req *DecryptRequest,
+) (*DecryptResponse, error) {
 	key := req.Key
 	var response *DecryptResponse
 	switch k := key.KeyType.(type) {
