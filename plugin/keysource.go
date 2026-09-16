@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -163,7 +164,8 @@ func (key *MasterKey) NeedsRotation() bool {
 
 // ToString converts the key to a string representation.
 func (key *MasterKey) ToString() string {
-	return string(key.encryptedKey)
+	configurationJson, _ := json.Marshal(key.Configuration)
+	return fmt.Sprintf("%s|%s", key.PluginName, string(configurationJson))
 }
 
 // ToMap converts the MasterKey to a map for serialization purposes.
