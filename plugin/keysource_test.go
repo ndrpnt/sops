@@ -23,7 +23,11 @@ func TestMain(m *testing.M) {
 }
 
 func TestMasterKey_DecryptContext(t *testing.T) {
-	require.NoError(t, os.Setenv("SOPS_PLUGIN_KMS_DUMMY_EXEC", os.Args[0]))
+	exe, err := os.Executable()
+	require.NoError(t, err)
+	// We don't use t.Setenv() here because it prevents parallel tests,
+	// which we can afford due to env vars not colliding.
+	require.NoError(t, os.Setenv("SOPS_PLUGIN_KMS_DUMMY_EXEC", exe))
 	masterKey, err := NewMasterKey(
 		"dummy",
 		map[string]any{"suffix": "ouiiiiii"},
