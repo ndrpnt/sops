@@ -10,6 +10,7 @@ of the purpose of this package is to make it easy to change the SOPS file format
 package stores
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strconv"
 	"strings"
@@ -274,7 +275,7 @@ func pluginKeysFromGroup(group sops.KeyGroup) (keys []pluginkey) {
 		switch key := key.(type) {
 		case *plugin.MasterKey:
 			keys = append(keys, pluginkey{
-				EncryptedDataKey: string(key.EncryptedDataKey()),
+				EncryptedDataKey: base64.StdEncoding.EncodeToString(key.EncryptedDataKey()),
 				PluginName:       key.PluginName,
 				Configuration:    key.Configuration,
 			})
@@ -514,7 +515,13 @@ func (pluginKey *pluginkey) toInternal() (*plugin.MasterKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	key.SetEncryptedDataKey([]byte(pluginKey.EncryptedDataKey))
+
+	enc, err := base64.StdEncoding.DecodeString(pluginKey.EncryptedDataKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode plugin encrypted data key: %w", err)
+	}
+	key.SetEncryptedDataKey(enc)
+
 	return key, nil
 }
 
