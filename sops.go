@@ -798,13 +798,13 @@ func (m *Metadata) UpdateMasterKeysWithKeyServices(dataKey []byte, svcs []keyser
 			}
 		}
 		for _, key := range group {
-			var keyErrs []error
 			svcKey, err := keyservice.KeyFromMasterKey(key)
 			if err != nil {
-				keyErrs = append(keyErrs, fmt.Errorf("failed to call plugin: %v", err))
+				errs = append(errs, fmt.Errorf("failed to convert master key %q to key service key: %w", key.ToString(), err))
 				continue
 			}
 			encrypted := false
+			var keyErrs []error
 			for _, svc := range svcs {
 				rsp, err := svc.Encrypt(context.Background(), &keyservice.EncryptRequest{
 					Key:       &svcKey,
