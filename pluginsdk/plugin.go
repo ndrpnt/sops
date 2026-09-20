@@ -8,20 +8,25 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"syscall"
 
 	pluginpb "github.com/getsops/sops/v3/plugin"
 	"google.golang.org/protobuf/proto"
 )
 
-// TODO: provide Init func
+// TODO: provide Init func ?
 type Plugin[T any] interface {
 	Wrap(context.Context, EncryptRequest[T]) (*EncryptResponse, error)
 	Unwrap(context.Context, DecryptRequest[T]) (*DecryptResponse, error)
 }
 
-// TODO: handle signals
 func Run[T any](plugin Plugin[T]) int {
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	// Release a blocked request read when the host cancels the operation.
+	stopRead := context.AfterFunc(ctx, func() { _ = os.Stdin.Close() })
+	defer stopRead()
 	command := flag.String("c", "", "encrypt or decrypt")
 	flag.Parse()
 	msgIn, err := io.ReadAll(os.Stdin)
