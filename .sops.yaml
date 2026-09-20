@@ -1,3 +1,6 @@
+# export SOPS_PLUGIN_KMS_SUFFIX_EXEC=$PWD/sops-plugin-kms-suffix
+# export SOPS_PLUGIN_KMS_SCW_EXEC=$PWD/sops-plugin-kms-scw
+# export SOPS_PLUGIN_KMS_AGE_EXEC=$PWD/sops-plugin-kms-age
 creation_rules:
   - plugin:
       - plugin_name: suffix
@@ -8,3 +11,7 @@ creation_rules:
           id: c5782ccc-5498-400c-901d-15df9d3dabd8
           region: fr-par
           associated_data: aGVsbG8=
+      - plugin_name: age
+        configuration:
+          # export SOPS_AGE_KEY=AGE-SECRET-KEY-1FPT2M82UYVFJNH5UGDLZA88CJE4GE7DKEVHJQ4XWKRF898L3GDFSE92CWT
+          recipient: age1gfz4tuscpk5amktyt6hy8zcu8je36sdlsq8tnqn54fqpv43f8fhq6npunx
