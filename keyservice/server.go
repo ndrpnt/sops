@@ -102,13 +102,13 @@ func (ks *Server) encryptWithAge(key *AgeKey, plaintext []byte) ([]byte, error) 
 	return []byte(ageKey.EncryptedKey), nil
 }
 
-func (ks *Server) encryptWithPlugin(key *PluginKey, plaintext []byte) ([]byte, error) {
+func (ks *Server) encryptWithPlugin(ctx context.Context, key *PluginKey, plaintext []byte) ([]byte, error) {
 	pluginKey, err := plugin.NewMasterKey(key.PluginName, key.Configuration.AsMap())
 	if err != nil {
 		return nil, err
 	}
 
-	if err := pluginKey.Encrypt(plaintext); err != nil {
+	if err := pluginKey.EncryptContext(ctx, plaintext); err != nil {
 		return nil, err
 	}
 
@@ -182,13 +182,13 @@ func (ks *Server) decryptWithAge(key *AgeKey, ciphertext []byte) ([]byte, error)
 	return []byte(plaintext), err
 }
 
-func (ks *Server) decryptWithPlugin(key *PluginKey, ciphertext []byte) ([]byte, error) {
+func (ks *Server) decryptWithPlugin(ctx context.Context, key *PluginKey, ciphertext []byte) ([]byte, error) {
 	pluginKey, err := plugin.NewMasterKey(key.PluginName, key.Configuration.AsMap())
 	if err != nil {
 		return nil, err
 	}
 	pluginKey.SetEncryptedDataKey(ciphertext)
-	plaintext, err := pluginKey.Decrypt()
+	plaintext, err := pluginKey.DecryptContext(ctx)
 	return []byte(plaintext), err
 }
 
@@ -257,7 +257,7 @@ func (ks Server) Encrypt(ctx context.Context,
 			Ciphertext: ciphertext,
 		}
 	case *Key_PluginKey:
-		ciphertext, err := ks.encryptWithPlugin(k.PluginKey, req.Plaintext)
+		ciphertext, err := ks.encryptWithPlugin(ctx, k.PluginKey, req.Plaintext)
 		if err != nil {
 			return nil, err
 		}
@@ -384,7 +384,7 @@ func (ks Server) Decrypt(ctx context.Context,
 			Plaintext: plaintext,
 		}
 	case *Key_PluginKey:
-		plaintext, err := ks.decryptWithPlugin(k.PluginKey, req.Ciphertext)
+		plaintext, err := ks.decryptWithPlugin(ctx, k.PluginKey, req.Ciphertext)
 		if err != nil {
 			return nil, err
 		}
