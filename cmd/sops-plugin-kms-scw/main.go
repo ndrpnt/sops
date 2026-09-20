@@ -13,7 +13,7 @@ import (
 func main() {
 	plugin, err := New()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "plugin error: instantiating Scaleway Key Manager client: %v\n", err)
+		fmt.Fprintf(os.Stderr, "plugin error: instantiating Scaleway Key Manager plugin: %v\n", err)
 		os.Exit(1)
 	}
 	os.Exit(sdk.Run(plugin))

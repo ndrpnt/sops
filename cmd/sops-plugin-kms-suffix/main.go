@@ -3,19 +3,13 @@ package main
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"os"
 
 	sdk "github.com/getsops/sops/v3/pluginsdk"
 )
 
 func main() {
-	plugin, err := New()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "plugin error: instantiating suffix plugin: %v\n", err)
-		os.Exit(1)
-	}
-	os.Exit(sdk.Run(plugin))
+	os.Exit(sdk.Run(suffixPlugin{}))
 }
 
 type suffixConfig struct {
@@ -24,17 +18,13 @@ type suffixConfig struct {
 
 type suffixPlugin struct{}
 
-func New() (*suffixPlugin, error) {
-	return &suffixPlugin{}, nil
-}
-
-func (p *suffixPlugin) Wrap(ctx context.Context, req sdk.EncryptRequest[suffixConfig]) (*sdk.EncryptResponse, error) {
+func (suffixPlugin) Wrap(ctx context.Context, req sdk.EncryptRequest[suffixConfig]) (*sdk.EncryptResponse, error) {
 	return &sdk.EncryptResponse{
 		Ciphertext: []byte(string(req.Plaintext) + req.Configuration.Suffix),
 	}, nil
 }
 
-func (p *suffixPlugin) Unwrap(ctx context.Context, req sdk.DecryptRequest[suffixConfig]) (*sdk.DecryptResponse, error) {
+func (suffixPlugin) Unwrap(ctx context.Context, req sdk.DecryptRequest[suffixConfig]) (*sdk.DecryptResponse, error) {
 	return &sdk.DecryptResponse{
 		Plaintext: bytes.TrimSuffix(req.Ciphertext, []byte(req.Configuration.Suffix)),
 	}, nil
