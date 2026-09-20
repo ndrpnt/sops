@@ -15,6 +15,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/getsops/sops/v3/logging"
 	"github.com/sirupsen/logrus"
@@ -188,16 +190,20 @@ func callPlugin(ctx context.Context, name string, command string, req []byte) ([
 	}
 
 	cmd := exec.CommandContext(ctx, execName, "-c", command)
-	// Bad PWD, see cmd.environ() for more
 	cmd.Env = append(os.Environ(), pluginEnv)
-	// Avoid running plugins in the client's working directory,
-	// as it might differ between clients.
-	cmd.Dir = os.TempDir()
+	cmd.Cancel = func() error {
+		if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+			return cmd.Process.Kill()
+		}
+		return nil
+	}
+	cmd.WaitDelay = 2 * time.Second
 	cmd.Stdin = bytes.NewReader(req)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
+	// TODO: à améliorer?
 	if log.IsLevelEnabled(logrus.DebugLevel) {
 		log.WithFields(logrus.Fields{"plugin": name, "command": command}).Debug("plugin call")
 		log.Debugf("stdin:\n%s", hex.Dump(req))
