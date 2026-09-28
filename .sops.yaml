@@ -15,6 +15,9 @@ creation_rules:
     #    configuration:
     #      # export SOPS_AGE_KEY=AGE-SECRET-KEY-1FPT2M82UYVFJNH5UGDLZA88CJE4GE7DKEVHJQ4XWKRF898L3GDFSE92CWT
     #      recipient: age1gfz4tuscpk5amktyt6hy8zcu8je36sdlsq8tnqn54fqpv43f8fhq6npunx
-      - plugin_name: hcvault
+    #  - plugin_name: hcvault
+    #    configuration:
+    #      uri: 'http://0.0.0.0:8200/v1/sops/keys/firstkey'
+      - plugin_name: pgp
         configuration:
-          uri: 'http://0.0.0.0:8200/v1/sops/keys/firstkey'
+          fingerprint: FBC7B9E2A4F9289AC0C1D4843D16CEE4A27381B4
