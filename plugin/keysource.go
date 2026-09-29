@@ -172,9 +172,11 @@ func (key *MasterKey) ToString() string {
 
 // ToMap converts the MasterKey to a map for serialization purposes.
 func (key MasterKey) ToMap() map[string]interface{} {
-	// Instancie Map vide
-	// return map[string]interface{}{}
-	return map[string]interface{}{"coucou": 4}
+	out := make(map[string]interface{})
+	out["plugin_name"] = key.PluginName
+	out["Configuration"] = key.Configuration
+	out["enc"] = key.encryptedKey
+	return out
 }
 
 // TypeToIdentifier returns the string identifier for the MasterKey type.
