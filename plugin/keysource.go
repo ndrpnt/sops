@@ -185,6 +185,8 @@ func (key *MasterKey) TypeToIdentifier() string {
 }
 
 func callPlugin(ctx context.Context, name string, command string, req []byte) ([]byte, error) {
+	log := log.WithFields(logrus.Fields{"plugin": name, "command": command})
+
 	execName := SopsPluginBinaryPrefix + name
 	sopsPluginExecEnv := strings.ToUpper(fmt.Sprintf(SopsPluginExecEnvFormat, name))
 	if execEnv := os.Getenv(sopsPluginExecEnv); execEnv != "" {
@@ -205,15 +207,18 @@ func callPlugin(ctx context.Context, name string, command string, req []byte) ([
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
-	// TODO: à améliorer?
-	if log.IsLevelEnabled(logrus.DebugLevel) {
-		log.WithFields(logrus.Fields{"plugin": name, "command": command}).Debug("plugin call")
-		log.Debugf("stdin:\n%s", hex.Dump(req))
-		log.Debugf("stdout:\n%s", hex.Dump(stdout.Bytes()))
-		if s := strings.TrimSpace(stderr.String()); s != "" {
-			log.Debugf("stderr: %s", s)
-		}
+
+	// FIXME: Log plaintext key
+	fields := logrus.Fields{
+		"stdin":  hex.Dump(req),
+		"stdout": hex.Dump(stdout.Bytes()),
 	}
+
+	if s := strings.TrimSpace(stderr.String()); s != "" {
+		fields["stderr"] = s
+	}
+
+	log.WithFields(fields).Debug("plugin call")
 
 	if err != nil {
 		var ee *exec.ExitError
