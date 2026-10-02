@@ -34,18 +34,41 @@ func Run[T any](plugin Plugin[T]) int {
 		fmt.Fprintf(os.Stderr, "plugin error: reading stdin: %v\n", err)
 		return 1
 	}
-	var resp interface{ Marshal() ([]byte, error) }
+	var msgOut []byte
 	switch *command {
 	case "encrypt":
 		var req EncryptRequest[T]
 		err = req.Unmarshal(msgIn)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "plugin error: reading request: %v\n", err)
-			return 1
+			resp := pluginpb.EncryptResponse{
+				Error: &pluginpb.Error{
+					Code:    pluginpb.Code_CODE_INVALID_ARGUMENT,
+					Message: fmt.Sprintf("unmarshal encrypt request: %v", err),
+				},
+			}
+			msgOut, err = proto.Marshal(&resp)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "plugin error: marshaling proto msg: %v\n", err)
+				return 1
+			}
 		}
-		resp, err = plugin.Wrap(ctx, req)
+		resp, err := plugin.Wrap(ctx, req)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "plugin error: wrapping key: %v\n", err)
+			resp := pluginpb.EncryptResponse{
+				Error: &pluginpb.Error{
+					Code:    pluginpb.Code_CODE_UNSPECIFIED,
+					Message: fmt.Sprintf("wrap key: %v", err),
+				},
+			}
+			msgOut, err = proto.Marshal(&resp)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "plugin error: marshaling proto msg: %v\n", err)
+				return 1
+			}
+		}
+		msgOut, err = resp.Marshal()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "plugin error: marshaling proto msg: %v\n", err)
 			return 1
 		}
 	case "decrypt":
@@ -64,7 +87,6 @@ func Run[T any](plugin Plugin[T]) int {
 		fmt.Fprintf(os.Stderr, "plugin error: unrecognized command: %s\n", *command)
 		return 1
 	}
-	msgOut, err := resp.Marshal()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "plugin error: writting response: %v\n", err)
 		return 1
