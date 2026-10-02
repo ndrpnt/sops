@@ -8,9 +8,7 @@ package plugin // import "github.com/getsops/sops/v3/kms"
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -96,6 +94,10 @@ func (key *MasterKey) EncryptContext(ctx context.Context, dataKey []byte) error 
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal EncryptResponse: %v", err)
 	}
+	if pErr := resp.GetError(); pErr != nil {
+		return fmt.Errorf("plugin returned error code %d (%s): %s",
+			pErr.Code, pErr.Code.String(), pErr.Message)
+	}
 
 	key.SetEncryptedDataKey(resp.Ciphertext)
 	return nil
@@ -155,6 +157,10 @@ func (key *MasterKey) DecryptContext(ctx context.Context) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal DecryptResponse: %v", err)
 	}
+	if pErr := resp.GetError(); pErr != nil {
+		return nil, fmt.Errorf("plugin returned error code %d (%s): %s",
+			pErr.Code, pErr.Code.String(), pErr.Message)
+	}
 
 	return resp.Plaintext, nil
 }
@@ -166,8 +172,8 @@ func (key *MasterKey) NeedsRotation() bool {
 
 // ToString converts the key to a string representation.
 func (key *MasterKey) ToString() string {
-	configurationJson, _ := json.Marshal(key.Configuration)
-	return fmt.Sprintf("%s|%s", key.PluginName, string(configurationJson))
+	configurationJSON, _ := json.Marshal(key.Configuration)
+	return fmt.Sprintf("%s|%s", key.PluginName, string(configurationJSON))
 }
 
 // ToMap converts the MasterKey to a map for serialization purposes.
@@ -208,25 +214,9 @@ func callPlugin(ctx context.Context, name string, command string, req []byte) ([
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 
-	// FIXME: Log plaintext key
-	fields := logrus.Fields{
-		"stdin":  hex.Dump(req),
-		"stdout": hex.Dump(stdout.Bytes()),
-	}
-
-	if s := strings.TrimSpace(stderr.String()); s != "" {
-		fields["stderr"] = s
-	}
-
-	log.WithFields(fields).Debug("plugin call")
+	log.Debugf("plugin logs: %s", stderr.String())
 
 	if err != nil {
-		var ee *exec.ExitError
-		if errors.As(err, &ee) {
-			if s := strings.TrimSpace(stderr.String()); len(s) > 0 {
-				return nil, fmt.Errorf("%v: %s", err, s)
-			}
-		}
 		return nil, err
 	}
 	return stdout.Bytes(), nil
