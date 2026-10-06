@@ -46,6 +46,10 @@ func NewError(code Code, cause error) *Error {
 	return &Error{code: code, cause: cause}
 }
 
+func NewErrorf(code Code, format string, args ...any) *Error {
+	return NewError(code, fmt.Errorf(format, args...))
+}
+
 func (e *Error) Code() Code {
 	if e == nil || e.code == 0 {
 		return CodeUnknown
