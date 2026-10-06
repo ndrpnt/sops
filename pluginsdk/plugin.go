@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -22,7 +21,83 @@ type Plugin[T any] interface {
 	Unwrap(context.Context, DecryptRequest[T]) (*DecryptResponse, error)
 }
 
-func Run[T any](plugin Plugin[T]) int {
+type Runner[T any] struct {
+	Plugin Plugin[T]
+}
+
+func (r *Runner[T]) Wrap(
+	ctx context.Context,
+	protoReq *pluginpb.EncryptRequest,
+) *pluginpb.EncryptResponse {
+	req := &EncryptRequest[T]{
+		Plaintext:     protoReq.GetPlaintext(),
+		Configuration: new(T),
+	}
+	jsonBytes, err := protoReq.GetConfiguration().MarshalJSON()
+	if err != nil {
+		return &pluginpb.EncryptResponse{
+			Error: &pluginpb.Error{
+				Code:    pluginpb.Code_CODE_INVALID_ARGUMENT,
+				Message: fmt.Sprintf("marshaling config to JSON: %v", err),
+			},
+		}
+	}
+	dec := json.NewDecoder(bytes.NewReader(jsonBytes))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(req.Configuration); err != nil {
+		return &pluginpb.EncryptResponse{
+			Error: &pluginpb.Error{
+				Code:    pluginpb.Code_CODE_INVALID_ARGUMENT,
+				Message: fmt.Sprintf("decoding config into %T: %v", req.Configuration, err),
+			},
+		}
+	}
+	resp, err := r.Plugin.Wrap(ctx, *req)
+	if err != nil {
+		return &pluginpb.EncryptResponse{
+			Error: WrapError(err).ToProto(),
+		}
+	}
+	return &pluginpb.EncryptResponse{Ciphertext: resp.Ciphertext}
+}
+
+func (r *Runner[T]) Unwrap(
+	ctx context.Context,
+	protoReq *pluginpb.DecryptRequest,
+) *pluginpb.DecryptResponse {
+	req := &DecryptRequest[T]{
+		Ciphertext:    protoReq.GetCiphertext(),
+		Configuration: new(T),
+	}
+	jsonBytes, err := protoReq.GetConfiguration().MarshalJSON()
+	if err != nil {
+		return &pluginpb.DecryptResponse{
+			Error: &pluginpb.Error{
+				Code:    pluginpb.Code_CODE_INVALID_ARGUMENT,
+				Message: fmt.Sprintf("marshaling config to JSON: %v", err),
+			},
+		}
+	}
+	dec := json.NewDecoder(bytes.NewReader(jsonBytes))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(req.Configuration); err != nil {
+		return &pluginpb.DecryptResponse{
+			Error: &pluginpb.Error{
+				Code:    pluginpb.Code_CODE_INVALID_ARGUMENT,
+				Message: fmt.Sprintf("decoding config into %T: %v", req.Configuration, err),
+			},
+		}
+	}
+	resp, err := r.Plugin.Unwrap(ctx, *req)
+	if err != nil {
+		return &pluginpb.DecryptResponse{
+			Error: WrapError(err).ToProto(),
+		}
+	}
+	return &pluginpb.DecryptResponse{Plaintext: resp.Plaintext}
+}
+
+func (r *Runner[T]) Run() int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	// Release a blocked request read when the host cancels the operation.
@@ -38,47 +113,23 @@ func Run[T any](plugin Plugin[T]) int {
 	var msgOut []byte
 	switch *command {
 	case "encrypt":
-		var req EncryptRequest[T]
-		var protoResp *pluginpb.EncryptResponse
-		err = req.Unmarshal(msgIn)
-		if err != nil {
-			protoResp = &pluginpb.EncryptResponse{
-				Error: NewErrorf(CodeInvalidArgument, "unmarshal encrypt request: %v", err).ToProto(),
-			}
-		} else {
-			resp, err := plugin.Wrap(ctx, req)
-			if err != nil {
-				pErr, ok := errors.AsType[*Error](err)
-				if !ok {
-					pErr = NewError(CodeUnknown, err)
-				}
-				protoResp = &pluginpb.EncryptResponse{Error: pErr.ToProto()}
-			} else {
-				protoResp = resp.ToProto()
-			}
+		var protoReq pluginpb.EncryptRequest
+		if err := proto.Unmarshal(msgIn, &protoReq); err != nil {
+			fmt.Fprintf(os.Stderr, "plugin error: unmarshaling proto msg: %v\n", err)
+			return 1
 		}
+		protoResp := r.Wrap(ctx, &protoReq)
 		if msgOut, err = proto.Marshal(protoResp); err != nil {
 			fmt.Fprintf(os.Stderr, "plugin error: marshaling proto msg: %v\n", err)
 			return 1
 		}
 	case "decrypt":
-		var req DecryptRequest[T]
-		err = req.Unmarshal(msgIn)
-		if err != nil {
+		var protoReq pluginpb.DecryptRequest
+		if err := proto.Unmarshal(msgIn, &protoReq); err != nil {
 			fmt.Fprintf(os.Stderr, "plugin error: unmarshaling proto msg: %v\n", err)
 			return 1
 		}
-		var protoResp *pluginpb.DecryptResponse
-		resp, err := plugin.Unwrap(ctx, req)
-		if err != nil {
-			pErr, ok := errors.AsType[*Error](err)
-			if !ok {
-				pErr = NewError(CodeUnknown, err)
-			}
-			protoResp = &pluginpb.DecryptResponse{Error: pErr.ToProto()}
-		} else {
-			protoResp = resp.ToProto()
-		}
+		protoResp := r.Unwrap(ctx, &protoReq)
 		if msgOut, err = proto.Marshal(protoResp); err != nil {
 			fmt.Fprintf(os.Stderr, "plugin error: marshaling proto msg: %v\n", err)
 			return 1
@@ -99,79 +150,15 @@ type EncryptRequest[T any] struct {
 	Configuration *T
 }
 
-func (r *EncryptRequest[T]) Unmarshal(msg []byte) error {
-	var protoReq pluginpb.EncryptRequest
-	if err := proto.Unmarshal(msg, &protoReq); err != nil {
-		return fmt.Errorf("unmarshaling proto msg: %w", err)
-	}
-	r.Plaintext = protoReq.GetPlaintext()
-	r.Configuration = new(T)
-	jsonBytes, err := protoReq.GetConfiguration().MarshalJSON()
-	if err != nil {
-		return fmt.Errorf("marshaling config to JSON: %w", err)
-	}
-	dec := json.NewDecoder(bytes.NewReader(jsonBytes))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(r.Configuration); err != nil {
-		return fmt.Errorf("decoding config into %T: %w", r.Configuration, err)
-	}
-	return nil
-}
-
 type DecryptRequest[T any] struct {
 	Ciphertext    []byte
 	Configuration *T
-}
-
-func (r *DecryptRequest[T]) Unmarshal(msg []byte) error {
-	var protoReq pluginpb.DecryptRequest
-	if err := proto.Unmarshal(msg, &protoReq); err != nil {
-		return fmt.Errorf("unmarshaling proto msg: %w", err)
-	}
-	r.Ciphertext = protoReq.GetCiphertext()
-	r.Configuration = new(T)
-	jsonBytes, err := protoReq.GetConfiguration().MarshalJSON()
-	if err != nil {
-		return fmt.Errorf("marshaling config to JSON: %w", err)
-	}
-	dec := json.NewDecoder(bytes.NewReader(jsonBytes))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(r.Configuration); err != nil {
-		return fmt.Errorf("decoding config into %T: %w", r.Configuration, err)
-	}
-	return nil
 }
 
 type DecryptResponse struct {
 	Plaintext []byte
 }
 
-func (resp *DecryptResponse) Marshal() ([]byte, error) {
-	protoResp := pluginpb.DecryptResponse{Plaintext: resp.Plaintext}
-	msg, err := proto.Marshal(&protoResp)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling proto msg: %w", err)
-	}
-	return msg, nil
-}
-
-func (resp *DecryptResponse) ToProto() *pluginpb.DecryptResponse {
-	return &pluginpb.DecryptResponse{Plaintext: resp.Plaintext}
-}
-
 type EncryptResponse struct {
 	Ciphertext []byte
-}
-
-func (resp *EncryptResponse) Marshal() ([]byte, error) {
-	protoResp := pluginpb.EncryptResponse{Ciphertext: resp.Ciphertext}
-	msg, err := proto.Marshal(&protoResp)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling proto msg: %w", err)
-	}
-	return msg, nil
-}
-
-func (resp *EncryptResponse) ToProto() *pluginpb.EncryptResponse {
-	return &pluginpb.EncryptResponse{Ciphertext: resp.Ciphertext}
 }

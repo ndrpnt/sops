@@ -92,3 +92,4 @@ We avoid storing user-specific info, like absolute paths, in versioned files (i.
 
 * How do we handle plugins that require user input, e.g. SSH passphrases in age
 * Should `EncryptResponse.ciphertext` and `DecryptRequest.ciphertext` be `bytes` or `string` ? I think the tradeoff is whether we force the plugin to return valid UTF-8 or if we do with any byte array and it's SOPS' job to base64-encode it.
+* Should a failure to unmarshal the Protobuf request be considered an application error or a system error, i.e. result in a nonzero exit code? Because failing to marshal the response is necessarily a system error, we also return a system error when failing to unmarshal the request. This keeps the code symmetrical, but is unlike PluginRPC.

@@ -35,7 +35,10 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	if os.Getenv("SOPS_SDK_TEST_PROCESS") == "1" {
-		os.Exit(sdk.Run(testPlugin{}))
+		runner := sdk.Runner[testConfig]{
+			Plugin: testPlugin{},
+		}
+		os.Exit(runner.Run())
 	}
 	os.Exit(m.Run())
 }
@@ -49,7 +52,7 @@ type testPlugin struct{}
 
 func (testPlugin) Wrap(ctx context.Context, req sdk.EncryptRequest[testConfig]) (*sdk.EncryptResponse, error) {
 	if req.Configuration.Mode == "wait" || req.Configuration.Mode == "ignore" {
-		if err := os.WriteFile(req.Configuration.Ready, nil, 0600); err != nil {
+		if err := os.WriteFile(req.Configuration.Ready, nil, 0o600); err != nil {
 			return nil, err
 		}
 		if req.Configuration.Mode == "ignore" {
@@ -58,7 +61,7 @@ func (testPlugin) Wrap(ctx context.Context, req sdk.EncryptRequest[testConfig]) 
 			}
 		}
 		<-ctx.Done()
-		if err := os.WriteFile(req.Configuration.Ready+".canceled", nil, 0600); err != nil {
+		if err := os.WriteFile(req.Configuration.Ready+".canceled", nil, 0o600); err != nil {
 			return nil, err
 		}
 		return nil, ctx.Err()
