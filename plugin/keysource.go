@@ -93,9 +93,15 @@ func (key *MasterKey) EncryptContext(ctx context.Context, dataKey []byte) error 
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal EncryptResponse: %v", err)
 	}
+	if resp.Ciphertext != nil && resp.Error != nil {
+		return fmt.Errorf("invalid EncryptResponse: ciphertext and error are both set")
+	}
 	if pErr := resp.GetError(); pErr != nil {
 		return fmt.Errorf("plugin returned error code %d (%s): %s",
 			pErr.Code, pErr.Code.String(), pErr.Message)
+	}
+	if len(resp.Ciphertext) == 0 {
+		return fmt.Errorf("invalid EncryptResponse: ciphertext is missing or empty")
 	}
 
 	key.SetEncryptedDataKey(resp.Ciphertext)
@@ -152,9 +158,15 @@ func (key *MasterKey) DecryptContext(ctx context.Context) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal DecryptResponse: %v", err)
 	}
+	if resp.Plaintext != nil && resp.Error != nil {
+		return nil, fmt.Errorf("invalid DecryptResponse: plaintext and error are both set")
+	}
 	if pErr := resp.GetError(); pErr != nil {
 		return nil, fmt.Errorf("plugin returned error code %d (%s): %s",
 			pErr.Code, pErr.Code.String(), pErr.Message)
+	}
+	if len(resp.Plaintext) == 0 {
+		return nil, fmt.Errorf("invalid DecryptResponse: plaintext is missing or empty")
 	}
 
 	return resp.Plaintext, nil

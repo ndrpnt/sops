@@ -25,7 +25,7 @@ A SOPS KMS plugin is a standalone executable file that:
 
 * Verifies that the `__SOPS_KMS_PLUGIN=1` environment variable is set, and exits with an error message otherwise.
 * Reads a protobuf message from stdin, containing the request.
-* Writes a protobuf message to stdout, containing the response, an error, or both.
+* Writes a protobuf message to stdout, containing either the response or an error.
 * Exits with code 0 unless there is a system error, in which case stdout is discarded
 * Optionally logs to stderr
 
