@@ -10,7 +10,8 @@ import (
 )
 
 func main() {
-	os.Exit(pluginsdk.Run(agePlugin{}))
+	runner := pluginsdk.NewRunner(agePlugin{})
+	os.Exit(runner.Run())
 }
 
 type ageConfig struct {

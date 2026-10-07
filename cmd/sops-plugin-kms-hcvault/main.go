@@ -9,7 +9,8 @@ import (
 )
 
 func main() {
-	os.Exit(pluginsdk.Run(hcvaultPlugin{}))
+	runner := pluginsdk.NewRunner(hcvaultPlugin{})
+	os.Exit(runner.Run())
 }
 
 type hcvaultConfig struct {
