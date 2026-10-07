@@ -9,7 +9,8 @@ import (
 )
 
 func main() {
-	os.Exit(sdk.Run(suffixPlugin{}))
+	runner := sdk.NewRunner(suffixPlugin{})
+	os.Exit(runner.Run())
 }
 
 type suffixConfig struct {

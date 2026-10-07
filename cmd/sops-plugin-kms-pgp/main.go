@@ -9,7 +9,8 @@ import (
 )
 
 func main() {
-	os.Exit(pluginsdk.Run(pgpPlugin{}))
+	runner := pluginsdk.NewRunner(pgpPlugin{})
+	os.Exit(runner.Run())
 }
 
 type pgpConfig struct {
@@ -21,7 +22,7 @@ type pgpPlugin struct{}
 func (pgpPlugin) Wrap(ctx context.Context, req pluginsdk.EncryptRequest[pgpConfig]) (*pluginsdk.EncryptResponse, error) {
 	key := pgp.NewMasterKeyFromFingerprint(req.Configuration.Fingerprint)
 	if err := key.Encrypt(req.Plaintext); err != nil {
-		return nil, err
+		return nil, pluginsdk.NewError(pluginsdk.CodeInternal, err)
 	}
 	return &pluginsdk.EncryptResponse{Ciphertext: key.EncryptedDataKey()}, nil
 }
@@ -31,7 +32,7 @@ func (pgpPlugin) Unwrap(ctx context.Context, req pluginsdk.DecryptRequest[pgpCon
 	key.SetEncryptedDataKey(req.Ciphertext)
 	plaintext, err := key.Decrypt()
 	if err != nil {
-		return nil, err
+		return nil, pluginsdk.NewError(pluginsdk.CodeInternal, err)
 	}
 	return &pluginsdk.DecryptResponse{Plaintext: plaintext}, nil
 }

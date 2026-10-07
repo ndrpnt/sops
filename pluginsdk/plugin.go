@@ -25,6 +25,12 @@ type Runner[T any] struct {
 	Plugin Plugin[T]
 }
 
+func NewRunner[T any](plugin Plugin[T]) Runner[T] {
+	return Runner[T]{
+		Plugin: plugin,
+	}
+}
+
 func (r *Runner[T]) Wrap(
 	ctx context.Context,
 	protoReq *pluginpb.EncryptRequest,
