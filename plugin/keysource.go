@@ -8,7 +8,6 @@ package plugin // import "github.com/getsops/sops/v3/kms"
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -42,20 +41,24 @@ func init() {
 }
 
 type MasterKey struct {
-	PluginName    string
-	Configuration map[string]any
-	encryptedKey  []byte
+	PluginName         string
+	ConfigurationProto *structpb.Struct
+	encryptedKey       []byte
 }
 
 // NewMasterKey creates a new MasterKey from an ARN, role and context, setting
 // the creation date to the current date.
-func NewMasterKey(pluginName string, additionalConfig map[string]any) (*MasterKey, error) {
+func NewMasterKey(pluginName string, configuration map[string]any) (*MasterKey, error) {
 	if strings.ContainsRune(pluginName, os.PathSeparator) {
 		return nil, fmt.Errorf("invalid plugin name, '/' not allowed in: %q", pluginName)
 	}
+	configProto, err := structpb.NewStruct(configuration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert configuration to proto struct: %v", err)
+	}
 	return &MasterKey{
-		PluginName:    pluginName,
-		Configuration: additionalConfig,
+		PluginName:         pluginName,
+		ConfigurationProto: configProto,
 	}, nil
 }
 
@@ -70,13 +73,9 @@ func (key *MasterKey) Encrypt(dataKey []byte) error {
 // EncryptContext takes a SOPS data key, encrypts it with KMS and stores the result
 // in the EncryptedKey field.
 func (key *MasterKey) EncryptContext(ctx context.Context, dataKey []byte) error {
-	protoConfig, err := structpb.NewStruct(key.Configuration)
-	if err != nil {
-		return fmt.Errorf("failed to build config struct: %v", err)
-	}
 	req := &EncryptRequest{
 		Plaintext:     dataKey,
-		Configuration: protoConfig,
+		Configuration: key.ConfigurationProto,
 	}
 
 	protoReq, err := proto.Marshal(req)
@@ -133,13 +132,9 @@ func (key *MasterKey) Decrypt() ([]byte, error) {
 // DecryptContext decrypts the EncryptedKey with a newly created AWS KMS config, and
 // returns the result.
 func (key *MasterKey) DecryptContext(ctx context.Context) ([]byte, error) {
-	protoConfig, err := structpb.NewStruct(key.Configuration)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build config struct: %v", err)
-	}
 	req := &DecryptRequest{
 		Ciphertext:    key.encryptedKey,
-		Configuration: protoConfig,
+		Configuration: key.ConfigurationProto,
 	}
 
 	protoReq, err := proto.Marshal(req)
@@ -172,15 +167,14 @@ func (key *MasterKey) NeedsRotation() bool {
 
 // ToString converts the key to a string representation.
 func (key *MasterKey) ToString() string {
-	configurationJSON, _ := json.Marshal(key.Configuration)
-	return fmt.Sprintf("%s|%s", key.PluginName, string(configurationJSON))
+	return fmt.Sprintf("%s|%s", key.PluginName, key.ConfigurationProto.String())
 }
 
 // ToMap converts the MasterKey to a map for serialization purposes.
 func (key MasterKey) ToMap() map[string]interface{} {
 	out := make(map[string]interface{})
 	out["plugin_name"] = key.PluginName
-	out["Configuration"] = key.Configuration
+	out["Configuration"] = key.ConfigurationProto.AsMap()
 	out["enc"] = key.encryptedKey
 	return out
 }

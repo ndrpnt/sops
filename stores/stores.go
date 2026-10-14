@@ -277,7 +277,7 @@ func pluginKeysFromGroup(group sops.KeyGroup) (keys []pluginkey) {
 			keys = append(keys, pluginkey{
 				EncryptedDataKey: base64.StdEncoding.EncodeToString(key.EncryptedDataKey()),
 				PluginName:       key.PluginName,
-				Configuration:    key.Configuration,
+				Configuration:    key.ConfigurationProto.AsMap(),
 			})
 		}
 	}
