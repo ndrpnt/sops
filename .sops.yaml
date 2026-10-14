@@ -1,6 +1,7 @@
 # export SOPS_PLUGIN_KMS_SUFFIX_EXEC=$PWD/sops-plugin-kms-suffix
 # export SOPS_PLUGIN_KMS_SCW_EXEC=$PWD/sops-plugin-kms-scw
 # export SOPS_PLUGIN_KMS_AGE_EXEC=$PWD/sops-plugin-kms-age
+# export SOPS_PLUGIN_KMS_PGP_EXEC=$PWD/sops-plugin-kms-pgp
 creation_rules:
   - plugin:
     # - plugin_name: suffix
